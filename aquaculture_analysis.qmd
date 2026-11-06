@@ -25,15 +25,15 @@ library(here)
 getwd()
 # Read in the data
 # SST files (rasters)
-sst_2008 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2008.tif"))
-sst_2009 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2009.tif"))
-sst_2010 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2010.tif"))
-sst_2011 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2011.tif"))
-sst_2012 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2012.tif"))
+sst_2008 <- terra::rast(here("data", "average_annual_sst_2008.tif"))
+sst_2009 <- terra::rast(here("data", "average_annual_sst_2009.tif"))
+sst_2010 <- terra::rast(here("data", "average_annual_sst_2010.tif"))
+sst_2011 <- terra::rast(here("data", "average_annual_sst_2011.tif"))
+sst_2012 <- terra::rast(here("data", "average_annual_sst_2012.tif"))
 # Depth file (raster)
-depth <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "depth.tif"))
+depth <- terra::rast(here("data", "depth.tif"))
 # EEZ file (shapefile)
-wc_eez_sf <- read_sf(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "wc_regions_clean.shp"))
+wc_eez_sf <- read_sf(here("data", "wc_regions_clean.shp"))
 
 # Combine SST rasters into a raster stack
 sst_stack <- c(sst_2008, sst_2009, sst_2010, sst_2011, sst_2012)
@@ -177,15 +177,15 @@ red_abalone <- data.frame(
 # Now create the function, where the sole argument is the dataframe for species of interest
 simplified_aquaculture_analysis <- function(species){
      # read in data
-     sst_2008 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2008.tif"))
-     sst_2009 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2009.tif"))
-     sst_2010 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2010.tif"))
-     sst_2011 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2011.tif"))
-     sst_2012 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2012.tif"))
+     sst_2008 <- terra::rast(here("data", "average_annual_sst_2008.tif"))
+     sst_2009 <- terra::rast(here("data", "average_annual_sst_2009.tif"))
+     sst_2010 <- terra::rast(here("data", "average_annual_sst_2010.tif"))
+     sst_2011 <- terra::rast(here("data", "average_annual_sst_2011.tif"))
+     sst_2012 <- terra::rast(here("data", "average_annual_sst_2012.tif"))
      # Depth file (raster)
-     depth <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "depth.tif"))
+     depth <- terra::rast(here("data", "depth.tif"))
      # EEZ file (shapefile)
-     wc_eez_sf <- read_sf(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "wc_regions_clean.shp"))
+     wc_eez_sf <- read_sf(here("data", "wc_regions_clean.shp"))
      
      # Clean/crop/reshape data
      sst_stack <- c(sst_2008, sst_2009, sst_2010, sst_2011, sst_2012)
@@ -254,15 +254,15 @@ simplified_aquaculture_analysis(red_abalone)
 # This version of the function takes minimum and maximum depth and SST as arugments in addition to species, as specified in the assignment.
 aquaculture_analysis <- function(min_sst, max_sst, min_depth, max_depth, species){
      # Read in data
-     sst_2008 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2008.tif"))
-     sst_2009 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2009.tif"))
-     sst_2010 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2010.tif"))
-     sst_2011 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2011.tif"))
-     sst_2012 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2012.tif"))
+     sst_2008 <- terra::rast(here("data", "average_annual_sst_2008.tif"))
+     sst_2009 <- terra::rast(here("data", "average_annual_sst_2009.tif"))
+     sst_2010 <- terra::rast(here("data", "average_annual_sst_2010.tif"))
+     sst_2011 <- terra::rast(here("data", "average_annual_sst_2011.tif"))
+     sst_2012 <- terra::rast(here("data", "average_annual_sst_2012.tif"))
      # Depth file (raster)
-     depth <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "depth.tif"))
+     depth <- terra::rast(here("data", "depth.tif"))
      # EEZ file (shapefile)
-     wc_eez_sf <- read_sf(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "wc_regions_clean.shp"))
+     wc_eez_sf <- read_sf(here("data", "wc_regions_clean.shp"))
      
      # Clean/crop/reshape data
      sst_stack <- c(sst_2008, sst_2009, sst_2010, sst_2011, sst_2012)
