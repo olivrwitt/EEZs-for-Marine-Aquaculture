@@ -1,4 +1,3 @@
-
 # Background/instructions
 Determining which Exclusive Economic Zones (EEZ) on the West Coast of the US are best suited to developing marine aquaculture for several species of oysters and a species of your choice. Suitable locations will be determined based on range of suitable sea surface temperature (SST) and depth values for the species.
 
@@ -10,6 +9,7 @@ Determining which Exclusive Economic Zones (EEZ) on the West Coast of the US are
 # Workflow outline
 ### Prepare data
 ```{r}
+getwd()
 # Load necessary packages
 library(tidyverse)
 library(sf)
@@ -21,31 +21,31 @@ library(spDataLarge)
 library(geodata)
 library(elevatr)
 library(tigris)
-
+library(here)
+getwd()
 # Read in the data
-# NOTE: wc_regions is a shapefile, and sst files and depth are rasters
-sst_2008 <- rast("EEZs-for-Marine-Aquaculture/EEZs-for-Marine-Aquaculture/data/average_annual_sst_2008.tif")
-sst_2009 <- rast("EEZs-for-Marine-Aquaculture/EEZs-for-Marine-Aquaculture/data/average_annual_sst_2009.tif")
-sst_2010 <- rast("EEZs-for-Marine-Aquaculture/EEZs-for-Marine-Aquaculture/data/average_annual_sst_2010.tif")
-sst_2011 <- rast("EEZs-for-Marine-Aquaculture/EEZs-for-Marine-Aquaculture/data/average_annual_sst_2011.tif")
-sst_2012 <- rast("EEZs-for-Marine-Aquaculture/EEZs-for-Marine-Aquaculture/data/average_annual_sst_2012.tif")
-
-depth <- rast("EEZs-for-Marine-Aquaculture/EEZs-for-Marine-Aquaculture/data/depth.tif")
-
-wc_eez_sf <- read_sf("EEZs-for-Marine-Aquaculture/EEZs-for-Marine-Aquaculture/data/wc_regions_clean.shp")
+# SST files (rasters)
+sst_2008 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2008.tif"))
+sst_2009 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2009.tif"))
+sst_2010 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2010.tif"))
+sst_2011 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2011.tif"))
+sst_2012 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2012.tif"))
+# Depth file (raster)
+depth <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "depth.tif"))
+# EEZ file (shapefile)
+wc_eez_sf <- read_sf(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "wc_regions_clean.shp"))
 
 # Combine SST rasters into a raster stack
 sst_stack <- c(sst_2008, sst_2009, sst_2010, sst_2011, sst_2012)
 
+# Check the class of the new raster (sanity check)
 class(sst_stack)
 ```
 
-
+/Users/oMac/Desktop/meds_stuff/eds223 repos folder/eds223-homeworks/EEZs-for-Marine-Aquaculture/EEZs-for-Marine-Aquaculture/aquaculture_analysis.qmd
 ### Process data
 ```{r}
 # Find mean SST
-summary(sst_stack)
-# Individual means: 2008 = 287.1; 2009 = 287.7; 2010 = 287.5; 2011 = 287.1; 2012 = 287.2
 sst_mean <- mean(sst_stack, na.rm=TRUE)
 sst_mean
 
@@ -60,7 +60,7 @@ depth_resampled <- resample(depth_crop, sst_mean_c, method = "bilinear")
 
 # Check that depth and SST match in resolution, extent, and CRS
 crs(depth_resampled) == crs(sst_mean_c)
-# They do not match in CRS --> need to match
+# They do not match in CRS, so we need to match them
 depth_proj <- project(depth_crop, sst_mean_c)
 depth_resampled <- resample(depth_proj, sst_mean_c, method = "bilinear")
 crs(depth_resampled) == crs(sst_mean_c)
@@ -69,36 +69,34 @@ ext(depth_resampled) == ext(sst_mean_c)
 res(depth_resampled) == res(sst_mean_c)
 # They match!
 
-# Let's look at it:
+# Let's visualize what we have so far:
 prelim_sst_map <- tm_shape(sst_mean_c) +
      tm_raster(col.legend = tm_legend(title = "Mean Sea Surface Temperature (C)")) +
      tm_title(text = "Mean Sea Surface Temperature")
 prelim_depth_map <- tm_shape(depth_resampled) +
      tm_raster(col.legend = tm_legend(title = "Depth/Elevation (m above sea level)")) +
      tm_title(text = "Depth")
-
 tmap_arrange(prelim_sst_map, prelim_depth_map, nrow = 1) 
 ```
 
 ### Find suitable locations
 ```{r}
-# reclassify SST and depth data into locations that are suitable for oysters 
-# set as "1" if temp is between 11-30°C and depth is between 0-70m, otherwise set as zero
-
+# Reclassify SST and depth data into locations that are suitable for oysters 
+# Set as "1" if depth is between 0-70m, otherwise set as zero
 depth_matrix <- matrix(c(- Inf, -70, 0,
                          -70, 0, 1,
                          0, Inf, 0),
                          ncol = 3, byrow = TRUE)
 depth_reclassified <- classify(depth_resampled, rcl = depth_matrix, include.lowest = TRUE)
 
-
+# Do the same thing for SST, setting to zero if temp is not 11-30C
 sst_matrix <- matrix(c(-Inf, 11, 0,
                          11, 30, 1,
                          30, Inf, 0),
                          ncol = 3, byrow = TRUE)
 sst_reclassified <- classify(sst_mean_c, rcl = sst_matrix, include.lowest = TRUE)
 
-# Let's look at it now:
+# Let's look at what we have now:
 reclass_sst_map <- tm_shape(sst_reclassified) +
      tm_raster(col.scale = tm_scale_categorical(labels = c("Unsuitable", "Suitable")),
      col.legend = tm_legend(title = "Suitable (1) vs Unsuitable (0)")) +
@@ -107,12 +105,12 @@ reclass_depth_map <- tm_shape(depth_reclassified) +
      tm_raster(col.scale = tm_scale_categorical(labels = c("Unsuitable", "Suitable")),
      col.legend = tm_legend(title = "Suitable (1) vs Unsuitable (0)")) +
      tm_title(text = "Depth Reclassified")
-
 tmap_arrange(reclass_sst_map, reclass_depth_map, nrow = 1) 
 
-# find locations that satisfy both SST and depth conditions
+# Find locations that satisfy both SST and depth conditions, using "lapp"
 suitable_oyster <- lapp(c(sst_reclassified, depth_reclassified), fun = function(x, y) x*y)
 
+# Map what we have now (the areas that satisfy the depth and temp requirements for oysters)
 satisfy_map <- tm_shape(suitable_oyster) +
      tm_raster(col.scale = tm_scale_categorical(labels = c("Unsuitable", "Suitable"), values = c("grey40", "green")),
           col.legend = tm_legend(title = "Suitable Oyster Locations")) +
@@ -120,32 +118,29 @@ satisfy_map <- tm_shape(suitable_oyster) +
 satisfy_map
 ```
 
-### Determine the most suitable EEZ
+### Determine the most suitable EEZs
 ```{r}
-# select suitable cells within West Coast EEZs
-# we need to overlay our suitability map and the EEZ map
-class(wc_eez_sf)
-# shapefile/tibble/dataframe --> need vector/raster interaction
+# Select suitable cells within West Coast EEZs.  We will need to overlay the suitability map and the EEZ map - this is a vector/raster interaction
 
-# we need to make sure the CRS match
+# First, we need to make sure the CRS match
 crs(wc_eez_sf) == crs(suitable_oyster)
 # CRS do NOT match
 wc_eez_sf_matched <- st_transform(wc_eez_sf, crs(suitable_oyster))
 crs(wc_eez_sf_matched) == crs(suitable_oyster)
 
-# find area of grid cells
+# Next, find area of grid cells
 cell_area <- cellSize(suitable_oyster, unit = "km")
 suitable_area <- cell_area * suitable_oyster
 
+# Rasterize wc_eez_sf, so that both EEZ data and suitable sites data are rasters
 wc_eez_sf_matched$id <- seq_len(nrow(wc_eez_sf_matched))
-
-# rasterize wc_eez_sf
 eez_raster <- rasterize(wc_eez_sf_matched, suitable_oyster, field = "id")
 
-# find the total suitable area within each EEZ (hint: it might be helpful to rasterize the EEZ data)
+# Find the total suitable area within each EEZ
 area_in_eez <- zonal(suitable_area, eez_raster, fun="sum", na.rm = TRUE)
 names(area_in_eez) <- c("id", "suitable_area_km2")
 
+# Create a final dataset of EEZs by area that is suitable for oysters
 eez_fin <- wc_eez_sf_matched |> 
      mutate(id = row_number()) |> 
      left_join(area_in_eez, by = "id") |> 
@@ -161,6 +156,8 @@ eez_fin
 Wrap all of the code inside a function so that it is reproducible for any species, provided that we know the depth and temperature requirements for that species.
 ```{r}
 # This version of the function is further simplified so that the only input is the species of interest.  This relies on a pre-filled data frame for each species that contains the minimum and maximum depth and SST suitable for that species.  A version of the function that takes minimum and maximum depth and SST as arugments in addition to species is in the next code block.
+
+# Create pre-filled oyster and red abalone dataframes first (can do this easily for any species of interest using data on SeaLifeBase)
 oyster <- data.frame(
      name = "Oyster",
      min_sst = 11,
@@ -177,26 +174,27 @@ red_abalone <- data.frame(
 )
 
 
-# then ...
+# Now create the function, where the sole argument is the dataframe for species of interest
 simplified_aquaculture_analysis <- function(species){
      # read in data
-     sst_2008 <- rast("EEZs-for-Marine-Aquaculture/EEZs-for-Marine-Aquaculture/data/average_annual_sst_2008.tif")
-     sst_2009 <- rast("EEZs-for-Marine-Aquaculture/EEZs-for-Marine-Aquaculture/data/average_annual_sst_2009.tif")
-     sst_2010 <- rast("EEZs-for-Marine-Aquaculture/EEZs-for-Marine-Aquaculture/data/average_annual_sst_2010.tif")
-     sst_2011 <- rast("EEZs-for-Marine-Aquaculture/EEZs-for-Marine-Aquaculture/data/average_annual_sst_2011.tif")
-     sst_2012 <- rast("EEZs-for-Marine-Aquaculture/EEZs-for-Marine-Aquaculture/data/average_annual_sst_2012.tif")
-     depth <- rast("EEZs-for-Marine-Aquaculture/EEZs-for-Marine-Aquaculture/data/depth.tif")
-     wc_eez_sf <- read_sf("EEZs-for-Marine-Aquaculture/EEZs-for-Marine-Aquaculture/data/wc_regions_clean.shp")
+     sst_2008 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2008.tif"))
+     sst_2009 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2009.tif"))
+     sst_2010 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2010.tif"))
+     sst_2011 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2011.tif"))
+     sst_2012 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2012.tif"))
+     # Depth file (raster)
+     depth <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "depth.tif"))
+     # EEZ file (shapefile)
+     wc_eez_sf <- read_sf(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "wc_regions_clean.shp"))
      
-     # clean/crop/reshape data
+     # Clean/crop/reshape data
      sst_stack <- c(sst_2008, sst_2009, sst_2010, sst_2011, sst_2012)
      sst_mean_c <- mean(sst_stack, na.rm=TRUE) - 273.15
      depth_crop <- crop(depth, sst_mean_c)
-     depth_resampled <- resample(depth_crop, sst_mean_c, method = "bilinear")
      depth_proj <- project(depth_crop, sst_mean_c)
      depth_resampled <- resample(depth_proj, sst_mean_c, method = "bilinear")
 
-     # filter for suitable locations
+     # Filter for suitable locations
      depth_matrix <- matrix(c(- Inf, -(species$max_depth), 0,
                               -(species$max_depth), -(species$min_depth), 1,
                               -(species$min_depth), Inf, 0),
@@ -209,7 +207,7 @@ simplified_aquaculture_analysis <- function(species){
      sst_reclassified <- classify(sst_mean_c, rcl = sst_matrix, include.lowest = TRUE)
      suitable_spots <- lapp(c(sst_reclassified, depth_reclassified), fun = function(x, y) x*y)
 
-     # choose parts of eez that are suitable
+     # Calculate suitable area by EEZ     
      wc_eez_sf_matched <- st_transform(wc_eez_sf, crs(suitable_spots))
      crs(wc_eez_sf_matched) == crs(suitable_spots)
      cell_area <- cellSize(suitable_spots, unit = "km")
@@ -225,48 +223,55 @@ simplified_aquaculture_analysis <- function(species){
           arrange(desc(suitable_area_km2)) |> 
           mutate(rank = row_number())
 
-     # map it
-     land <- ifel(depth > 0, depth, NA)
+     # Map suitability
+     land <- ifel(depth_resampled > 0, 1, NA)
      suit_map <- tm_shape(eez_fin) +
+          tm_graticules() +
           tm_polygons("suitable_area_km2", fill.scale =
                tm_scale_intervals(values = "viridis"), 
                fill.legend = tm_legend(
-                    title = "Suitable Area (km²)",
-                    title.size = 0.9,
-                    text.size = 0.7))  +
+                    title = "Amount of Suitable Area\nin EEZ (km²)",
+                    title.size = 0.6,
+                    text.size = 0.5))  +
           tm_title(
                paste0("West Coast EEZs by Area Suitable\nfor ", species$name, " Cultivation"), 
-               size = 1.4, 
+               size = 1, 
                fontface = "bold") +
+          tm_scalebar(position = tm_pos_out("center", "bottom")) +
           tm_shape(land) +
-               tm_polygons(fill = "grey")
+               tm_raster(col.scale = tm_scale_categorical(values = "grey"),
+            col.legend = tm_legend_hide()) +
+          tm_layout(bg.color = "lightblue") +
+          tm_options(component.autoscale = FALSE)
      suit_map
 }
 
+simplified_aquaculture_analysis(oyster)
 simplified_aquaculture_analysis(red_abalone)
 ```
 
 ```{r}
-# This version of the function takes minimum and maximum depth and SST as arugments in addition to species, as specified in the assingment.
+# This version of the function takes minimum and maximum depth and SST as arugments in addition to species, as specified in the assignment.
 aquaculture_analysis <- function(min_sst, max_sst, min_depth, max_depth, species){
-     # read in data
-     sst_2008 <- rast("EEZs-for-Marine-Aquaculture/EEZs-for-Marine-Aquaculture/data/data-2/average_annual_sst_2008.tif")
-     sst_2009 <- rast("EEZs-for-Marine-Aquaculture/EEZs-for-Marine-Aquaculture/data/data-2/average_annual_sst_2009.tif")
-     sst_2010 <- rast("EEZs-for-Marine-Aquaculture/EEZs-for-Marine-Aquaculture/data/data-2/average_annual_sst_2010.tif")
-     sst_2011 <- rast("EEZs-for-Marine-Aquaculture/EEZs-for-Marine-Aquaculture/data/data-2/average_annual_sst_2011.tif")
-     sst_2012 <- rast("EEZs-for-Marine-Aquaculture/EEZs-for-Marine-Aquaculture/data/data-2/average_annual_sst_2012.tif")
-     depth <- rast("EEZs-for-Marine-Aquaculture/EEZs-for-Marine-Aquaculture/data/data-2/depth.tif")
-     wc_eez_sf <- read_sf("EEZs-for-Marine-Aquaculture/EEZs-for-Marine-Aquaculture/data/data-2/wc_regions_clean.shp")
+     # Read in data
+     sst_2008 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2008.tif"))
+     sst_2009 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2009.tif"))
+     sst_2010 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2010.tif"))
+     sst_2011 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2011.tif"))
+     sst_2012 <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "average_annual_sst_2012.tif"))
+     # Depth file (raster)
+     depth <- terra::rast(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "depth.tif"))
+     # EEZ file (shapefile)
+     wc_eez_sf <- read_sf(here("EEZs-for-Marine-Aquaculture/", "EEZs-for-Marine-Aquaculture/", "data", "wc_regions_clean.shp"))
      
-     # clean/crop/reshape data
+     # Clean/crop/reshape data
      sst_stack <- c(sst_2008, sst_2009, sst_2010, sst_2011, sst_2012)
      sst_mean_c <- mean(sst_stack, na.rm=TRUE) - 273.15
      depth_crop <- crop(depth, sst_mean_c)
-     depth_resampled <- resample(depth_crop, sst_mean_c, method = "bilinear")
      depth_proj <- project(depth_crop, sst_mean_c)
      depth_resampled <- resample(depth_proj, sst_mean_c, method = "bilinear")
 
-     # filter for suitable locations
+     # Filter for suitable locations
      depth_matrix <- matrix(c(- Inf, -(max_depth), 0,
                               -(max_depth), -(min_depth), 1,
                               -(min_depth), Inf, 0),
@@ -279,7 +284,7 @@ aquaculture_analysis <- function(min_sst, max_sst, min_depth, max_depth, species
      sst_reclassified <- classify(sst_mean_c, rcl = sst_matrix, include.lowest = TRUE)
      suitable_spots <- lapp(c(sst_reclassified, depth_reclassified), fun = function(x, y) x*y)
 
-     # choose parts of eez that are suitable
+     # Calculate suitable area by EEZ
      wc_eez_sf_matched <- st_transform(wc_eez_sf, crs(suitable_spots))
      crs(wc_eez_sf_matched) == crs(suitable_spots)
      cell_area <- cellSize(suitable_spots, unit = "km")
@@ -295,20 +300,26 @@ aquaculture_analysis <- function(min_sst, max_sst, min_depth, max_depth, species
           arrange(desc(suitable_area_km2)) |> 
           mutate(rank = row_number())
 
-     # map it
+     # Map suitability
+     land <- ifel(depth_resampled > 0, 1, NA)
      suit_map <- tm_shape(eez_fin) +
           tm_graticules() +
           tm_polygons("suitable_area_km2", fill.scale =
                tm_scale_intervals(values = "viridis"), 
                fill.legend = tm_legend(
-                    title = "Suitable Area (km²)",
-                    title.size = 0.9,
-                    text.size = 0.7))  +
-          tm_scalebar(position = tm_pos_out("center", "bottom")) +
+                    title = "Amount of Suitable Area\nin EEZ (km²)",
+                    title.size = 0.6,
+                    text.size = 0.5))  +
           tm_title(
                paste0("West Coast EEZs by Area Suitable\nfor ", species, " Cultivation"), 
-               size = 1.4, 
-               fontface = "bold")
+               size = 1, 
+               fontface = "bold") +
+          tm_scalebar(position = tm_pos_out("center", "bottom")) +
+          tm_shape(land) +
+               tm_raster(col.scale = tm_scale_categorical(values = "grey"),
+            col.legend = tm_legend_hide()) +
+          tm_layout(bg.color = "lightblue") +
+          tm_options(component.autoscale = FALSE)
      suit_map
 }
 
